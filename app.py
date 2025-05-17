@@ -1,29 +1,14 @@
 import streamlit as st
 import google.generativeai as genai
-import os
-from dotenv import load_dotenv
-
-# 환경 변수 불러오기 (로컬과 Streamlit Cloud 모두 지원)
-load_dotenv()
-API_KEY = os.getenv("GOOGLE_API_KEY")
-
-# Streamlit Secrets에서도 API 키 확인 (Streamlit Cloud 배포용)
-if not API_KEY and 'GOOGLE_API_KEY' in st.secrets:
-    API_KEY = st.secrets['GOOGLE_API_KEY']
-
-# API 키 확인
-if not API_KEY:
-    st.error("❌ API 키가 설정되지 않았습니다. .env 파일이나 Streamlit Secrets를 확인하세요.")
-    st.stop()
-
-# Google Gemini API 설정
-genai.configure(api_key=API_KEY)
 
 # 페이지 설정
 st.set_page_config(page_title="나만의 GPT 챗봇", page_icon="🤖")
 st.title("🤖 나만의 프롬프트 기반 Gemini 챗봇")
 
-# 세션 상태 초기화
+# Gemini API 설정
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+
+# 세션 초기화
 if "chat" not in st.session_state:
     st.session_state.chat = None
 if "prompt" not in st.session_state:
@@ -39,7 +24,10 @@ with st.sidebar:
         if new_prompt.strip():
             st.session_state.prompt = new_prompt.strip()
             st.session_state.messages = []  # 대화 기록 초기화
-            st.session_state.chat = genai.GenerativeModel("gemini-1.5-pro").start_chat(
+            
+            # 모델 초기화
+            model = genai.GenerativeModel("gemini-1.5-pro")
+            st.session_state.chat = model.start_chat(
                 history=[],
                 generation_config={
                     "temperature": 0.7,
@@ -47,10 +35,15 @@ with st.sidebar:
                     "top_k": 40
                 }
             )
+            
             # 시스템 메시지 전송
             system_msg = f"당신은 다음 지침을 따라야 합니다: {st.session_state.prompt}"
-            st.session_state.chat.send_message(system_msg)
-            st.success("프롬프트가 적용되었습니다!")
+            try:
+                st.session_state.chat.send_message(system_msg)
+                st.success("프롬프트가 적용되었습니다!")
+            except Exception as e:
+                st.error(f"프롬프트 적용 중 오류 발생: {e}")
+                st.session_state.chat = None
         else:
             st.warning("프롬프트를 입력해주세요.")
         st.rerun()
@@ -80,6 +73,7 @@ if st.session_state.chat:
                     reply = response.text
                 except Exception as e:
                     reply = f"❌ 오류 발생: {e}"
+                    st.session_state.chat = None  # 오류 발생 시 채팅 세션 초기화
                 st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
 

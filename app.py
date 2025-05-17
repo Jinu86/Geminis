@@ -20,63 +20,68 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 
 # 페이지 설정
-st.set_page_config(page_title="Gemini Chatbot", page_icon="🤖")
-st.title("🤖 Gemini 챗봇")
+st.set_page_config(page_title="나만의 GPT 챗봇", page_icon="🤖")
+st.title("🤖 나만의 프롬프트 기반 Gemini 챗봇")
 
 # 세션 상태 초기화
+if "chat" not in st.session_state:
+    st.session_state.chat = None
+if "prompt" not in st.session_state:
+    st.session_state.prompt = ""
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 기본 프롬프트 초기화
-if "system_prompt" not in st.session_state:
-    st.session_state.system_prompt = "당신은 친절하고 도움이 되는 AI 비서입니다. 질문에 명확하고 정확하게 답변해 주세요."
-
-# 사이드바에 프롬프트 편집 영역 추가
+# 📍 사이드바 - 프롬프트 입력 및 적용
 with st.sidebar:
-    st.subheader("프롬프트 설정")
-    new_prompt = st.text_area("시스템 프롬프트 수정", st.session_state.system_prompt, height=150)
-    if st.button("프롬프트 적용"):
-        st.session_state.system_prompt = new_prompt
-        st.success("✅ 새 프롬프트가 적용되었습니다!")
+    st.header("🛠️ 챗봇 역할 설정")
+    new_prompt = st.text_area("프롬프트를 입력하세요", value=st.session_state.prompt, height=150)
+    if st.button("✅ 프롬프트 적용", use_container_width=True):
+        if new_prompt.strip():
+            st.session_state.prompt = new_prompt.strip()
+            st.session_state.messages = []  # 대화 기록 초기화
+            st.session_state.chat = genai.GenerativeModel("gemini-pro").start_chat(
+                history=[],
+                generation_config={
+                    "temperature": 0.7,
+                    "top_p": 0.8,
+                    "top_k": 40
+                }
+            )
+            # 시스템 메시지 전송
+            system_msg = f"당신은 다음 지침을 따라야 합니다: {st.session_state.prompt}"
+            st.session_state.chat.send_message(system_msg)
+            st.success("프롬프트가 적용되었습니다!")
+        else:
+            st.warning("프롬프트를 입력해주세요.")
+        st.rerun()
 
-# 채팅 기록 지우기 버튼
-if st.sidebar.button("채팅 기록 지우기"):
-    st.session_state.messages = []
-    st.rerun()
+# 🎯 현재 설정된 프롬프트 표시
+if st.session_state.prompt:
+    st.info(f"🎯 현재 프롬프트: {st.session_state.prompt}")
 
-# 이전 채팅 출력
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# 💬 대화 영역
+if st.session_state.chat:
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-# 사용자 입력 받기
-user_input = st.chat_input("메시지를 입력하세요")
+    user_input = st.chat_input("메시지를 입력하세요.")
+    if user_input:
+        # 사용자 메시지 출력
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        st.session_state.messages.append({"role": "user", "content": user_input})
 
-if user_input:
-    # 사용자 메시지 표시
-    st.chat_message("user").markdown(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    
-    try:
-        # 모델 설정
-        model = genai.GenerativeModel("models/gemini-1.5-flash")
-        
-        # 고정 프롬프트와 사용자 입력을 합쳐서 전송
-        full_prompt = f"{st.session_state.system_prompt}\n\n사용자: {user_input}"
-        
-        # 채팅 기록이 있는 경우 이전 대화 맥락 추가
-        if len(st.session_state.messages) > 1:
-            chat_history = ""
-            for msg in st.session_state.messages[:-1]:  # 마지막 메시지(방금 입력한 것) 제외
-                prefix = "사용자: " if msg["role"] == "user" else "AI: "
-                chat_history += f"{prefix}{msg['content']}\n"
-            full_prompt = f"{st.session_state.system_prompt}\n\n{chat_history}\n사용자: {user_input}"
-        
-        response = model.generate_content(full_prompt)
-        
-        # 봇 응답 표시
-        bot_reply = response.text
-        st.chat_message("assistant").markdown(bot_reply)
-        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-    except Exception as e:
-        st.error(f"❌ 오류 발생: {e}") 
+        # Gemini 응답 처리
+        with st.chat_message("assistant"):
+            with st.spinner("답변 생성 중..."):
+                try:
+                    response = st.session_state.chat.send_message(user_input)
+                    reply = response.text
+                except Exception as e:
+                    reply = f"❌ 오류 발생: {e}"
+                st.markdown(reply)
+        st.session_state.messages.append({"role": "assistant", "content": reply})
+
+else:
+    st.info("왼쪽 사이드바에서 프롬프트를 설정하고 '프롬프트 적용' 버튼을 눌러주세요.") 

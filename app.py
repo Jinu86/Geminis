@@ -39,8 +39,12 @@ with st.sidebar:
             # 시스템 메시지 전송
             system_msg = f"당신은 다음 지침을 따라야 합니다: {st.session_state.prompt}"
             try:
-                st.session_state.chat.send_message(system_msg)
-                st.success("프롬프트가 적용되었습니다!")
+                response = st.session_state.chat.send_message(system_msg)
+                if response.text:
+                    st.success("프롬프트가 적용되었습니다!")
+                else:
+                    st.error("프롬프트 적용에 실패했습니다.")
+                    st.session_state.chat = None
             except Exception as e:
                 st.error(f"프롬프트 적용 중 오류 발생: {e}")
                 st.session_state.chat = None
@@ -71,6 +75,9 @@ if st.session_state.chat:
                 try:
                     response = st.session_state.chat.send_message(user_input)
                     reply = response.text
+                    if not reply:
+                        reply = "응답을 생성할 수 없습니다."
+                        st.session_state.chat = None
                 except Exception as e:
                     reply = f"❌ 오류 발생: {e}"
                     st.session_state.chat = None  # 오류 발생 시 채팅 세션 초기화

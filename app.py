@@ -39,7 +39,7 @@ with st.sidebar:
         if new_prompt.strip():
             st.session_state.prompt = new_prompt.strip()
             st.session_state.messages = []  # 대화 기록 초기화
-            st.session_state.chat = genai.GenerativeModel("gemini-pro").start_chat(
+            st.session_state.chat = genai.GenerativeModel("gemini-1.5-pro").start_chat(
                 history=[],
                 generation_config={
                     "temperature": 0.7,

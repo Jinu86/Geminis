@@ -5,8 +5,13 @@ import google.generativeai as genai
 st.set_page_config(page_title="나만의 GPT 챗봇", page_icon="🤖")
 st.title("🤖 나만의 프롬프트 기반 Gemini 챗봇")
 
-# Gemini API 설정
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# API 키 설정 (안전하게 처리)
+try:
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+except Exception as e:
+    st.error("❌ API 키 설정 오류가 발생했습니다. Streamlit Secrets에 GOOGLE_API_KEY가 설정되어 있는지 확인하세요.")
+    st.stop()
 
 # 세션 초기화
 if "messages" not in st.session_state:
